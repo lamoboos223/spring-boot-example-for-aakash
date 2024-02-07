@@ -14,8 +14,7 @@ public class SalaryController {
     public String validateSalary(@RequestBody SalaryModel request) {
 
         WebClient webClient = WebClient.builder()
-//                .baseUrl("http://localhost:8181/v1/data/httpapi/authz")
-                .baseUrl("https://webhook.site/77742bbf-0460-4b91-84f8-a2a6abccaf2c")
+                .baseUrl("http://localhost:8181/v1/data/httpapi/authz")
                 .build();
         webClient.post()
                 .contentType(MediaType.APPLICATION_JSON)
