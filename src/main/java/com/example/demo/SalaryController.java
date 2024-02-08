@@ -1,5 +1,6 @@
 package com.example.demo;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -10,28 +11,45 @@ import reactor.core.publisher.Mono;
 
 @RestController
 public class SalaryController {
-    @PostMapping(value = "/salary", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public String validateSalary(@RequestBody SalaryModel request) {
+    private final WebClient webClient;
+    private final ObjectMapper objectMapper;
 
-        WebClient webClient = WebClient.builder()
+    public SalaryController() {
+        this.webClient = WebClient.builder()
                 .baseUrl("http://localhost:8181/v1/data/httpapi/authz")
                 .build();
-        webClient.post()
+        this.objectMapper = new ObjectMapper();
+    }
+
+    @PostMapping(value = "/salary", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public Mono<String> validateSalary(@RequestBody SalaryModel request) {
+        String opaPayload = String.format("{" +
+                "\"input\": {" +
+                "\"user\": \"%s\"," +
+                "\"path\": [\"finance\", \"salary\", \"%s\"]," +
+                "\"method\": \"POST\"" +
+                "}" +
+                "}", request.getUsername(), request.getEmployee());
+
+        return webClient.post()
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(BodyInserters.fromValue(request))
+                .header("Content-Type", "application/json")
+                .body(BodyInserters.fromValue(opaPayload))
                 .retrieve()
                 .bodyToMono(String.class)
-                .onErrorResume(throwable -> { // Handle errors here, log, retry, etc.
-                    return Mono.just("An error occurred.");
-                })
                 .map(response -> {
-                    if (response.contains("\"allow\":true")) {
-                        return "You are authorized to view the salary of the employee";
-                    } else {
-                        return "You are not authorized to view the salary of the employee";
+                    try {
+                        // Deserialize the JSON response into a Java object
+                        SalaryResponse responseObj = objectMapper.readValue(response, SalaryResponse.class);
+                        if (responseObj.getResult().isAllow()) {
+                            return "Authorized";
+                        }
+                        return "Not Authorized";
+                    } catch (Exception e) {
+                        // Handle any exceptions that occur during deserialization
+                        e.printStackTrace();
+                        return "Error";
                     }
-                })
-                .subscribe();
-        return "error";
+                });
     }
 }
